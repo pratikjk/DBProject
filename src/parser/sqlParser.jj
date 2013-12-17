@@ -1,0 +1,759 @@
+/**
+ * JavaCC template file created by SF JavaCC plugin 1.5.17+ wizard for JavaCC 1.5.0+
+ */
+options
+{
+	JDK_VERSION = "1.5";
+	static = true;
+}
+
+PARSER_BEGIN(Parser)
+package edu.buffalo.cse.sql.parser;
+
+import edu.buffalo.cse.sql.*;
+import java.util.*;
+import java.io.File;
+import edu.buffalo.cse.sql.plan.*;
+import edu.buffalo.cse.sql.Schema.Type;
+
+
+public class Parser
+{
+	static List<PlanNode > allRoots;
+	static Map<String, Schema.TableFromFile > allTables;
+	public static void main(String args []) throws ParseException
+	{
+	}
+}
+
+PARSER_END(Parser)
+
+SKIP :
+{
+	" "
+	| "\r"
+	| "\t"
+	| "\n"
+	| "\rn"
+}
+
+TOKEN:
+{
+		< SEMICOLON:";" >
+		| < COMMA:"," >
+		| < CREATE_TABLE: "CREATE TABLE"|"create table" >
+		| < FROM_FILE: "FROM FILE"|"from file" >
+		| < USING_CSV: "USING CSV"|"using csv" >
+		| < LBRAC: "(" >
+		| < RBRAC:")" >
+		| < INTDT:"INT"|"int" >
+		| < FLOATDT:"FLOAT"|"float" >
+		| < STRINGDT:"STRING"|"string" >
+		| < SELECT :"SELECT"|"select" >
+		| < EXPONENTIAL :("-")?(["0"-"9"])+"."(["0"-"9"])*"e"("-")?(["0"-"9"])+ >
+		| < INTNUMBER:("-")?(["0"-"9"])+ >
+		| < FLOATNUMBER:("-")?(["0"-"9"])+"."(["0"-"9"])+>
+		| < PLUS:"+" >
+		| < MINUS:"-" >
+		| < MULTIPLY:"*" >
+		| < DIVIDE:"/" >
+		| < EQUAL:"=" >
+		| < NOTEQUAL:"<>"|"< >" >
+		| < LESSTHAN:"<" >
+		| < GREATERTHAN:">" >
+		| < LESSTHANEQUAL:"<=" >
+		| < GREATERTHANEQUAL:">=" >
+		| < TRUE:"TRUE"|"true" >
+		| < FALSE:"FALSE"|"false" >
+		| < AND:"AND"|"and" >
+		| < OR:"OR"|"or" >
+		| < NOT:"NOT"|"not" >
+		| < FROM: "FROM"|"from" >
+		| < WHERE: "WHERE"|"where" >
+		| < GROUP_BY: "GROUP BY"|"group by" >
+		| < AS: "AS"|"as" >
+		| < SUM: "SUM"|"sum" >
+		| < AVG: "AVG"|"avg" >
+		| < MAX: "MAX"|"max" >
+		| < MIN:"MIN"|"min" >
+		| < UNION:"UNION"|"union" >
+		| < COUNTAGG:"COUNT(*)"|"count(*)" >
+		| < SINGLEQUOTE: "'" >
+		| < PATH: "'"(["A"-"z","a"-"z","0"-"9","/","."])+"'" >
+		//| < ESCAPEDSTRING: "'"((["A"-"z","a"-"z","0"-"9","/"])*("'/")*(["A"-"z","a"-"z","0"-"9","/"])*)?"'" >
+		| < STRING :(["A"-"Z","a"-"z","0"-"9"])+ >
+		| < CHARACTER: (["A"-"Z","a"-"z","0"-"9","'","/"]) >}
+		
+
+
+
+	Map<String,Object > parseSQL() :
+	{}
+	{
+
+		{
+			allRoots=new ArrayList<PlanNode >();
+			allTables=new HashMap<String, Schema.TableFromFile >();
+		}
+		(
+				select() |
+				create())*
+				< EOF >
+		{
+			Map<String,Object > result=new HashMap<String,Object >();
+			result.put("Tables",allTables);
+			result.put("Roots",allRoots);
+			return result;
+		}
+	}
+
+	void select():
+	{PlanNode root;
+	PlanNode lhs;
+	PlanNode rhs;
+	PlanNode child1=null;
+	PlanNode child2=null;
+	ExprTree constantExpression;
+	ExprTree condition=null;
+	String constColumnName=new String();
+	Token constTemp;}
+	{		 (< SELECT >		    (		      (				    constantExpression=constCondition()				    {				      constColumnName="EXPR";				    }				(						< AS >						constTemp=< STRING >						{							constColumnName=constTemp.image; 						}				)?								{			 		NullSourceNode child_1 = new NullSourceNode(1);					root=new ProjectionNode();					((ProjectionNode)root).addColumn(new ProjectionNode.Column(constColumnName, constantExpression));					((ProjectionNode)root).setChild(child_1);				}
+
+				(
+				  < COMMA >
+				   constantExpression=constCondition()
+				    {
+				      constColumnName="EXPR";
+				    }
+				(
+						< AS >
+						constTemp=< STRING >
+						{
+							constColumnName=constTemp.image; 
+						}
+				)?
+				
+				{
+					((ProjectionNode)root).addColumn(new ProjectionNode.Column(constColumnName, constantExpression));
+				}
+				  				)*			) //just for constants		|
+		(
+			(root=aggregate()|root=columnList())
+			< FROM >
+			child2=relations()
+			(				< WHERE >
+				condition=whereClause()				{					child1=new SelectionNode(condition);
+				}
+			)?
+			{
+			  if(child1==null)
+			  	((PlanNode.Unary )root).setChild(child2);
+			  else			  {			     	((PlanNode.Unary )child1).setChild(child2);
+			     	((PlanNode.Unary )root).setChild(child1);
+			  }			  	  			}
+			
+		) //just the aggregates
+	)
+	(< UNION >
+
+	//same as select
+< SELECT >
+		    (
+		      (
+				    constantExpression=constCondition()
+				    {
+				      constColumnName="EXPR";
+				    }
+				(
+						< AS >
+						constTemp=< STRING >
+						{
+							constColumnName=constTemp.image; 
+						}
+				)?
+				
+				{
+			 		NullSourceNode child_1 = new NullSourceNode(1);
+					rhs=new ProjectionNode();
+					((ProjectionNode)rhs).addColumn(new ProjectionNode.Column(constColumnName, constantExpression));
+					((ProjectionNode)rhs).setChild(child_1);
+				}
+
+
+				(< COMMA >
+				   constantExpression=constCondition()
+				    {
+				      constColumnName="EXPR";
+				    }
+				(
+						< AS >
+						constTemp=< STRING >
+						{
+							constColumnName=constTemp.image; 
+						}
+				)?
+				
+				{
+					((ProjectionNode)rhs).addColumn(new ProjectionNode.Column(constColumnName, constantExpression));
+				}
+				  
+				)*
+
+
+				
+			) //just for constants
+		|
+		(
+			(rhs=aggregate()|rhs=columnList())
+			< FROM >
+			child2=relations()
+			(
+				< WHERE >
+				condition=whereClause()
+				{
+					child1=new SelectionNode(condition);
+				}
+			)?
+			{
+			  if(child1==null)
+			  	((PlanNode.Unary )rhs).setChild(child2);
+			  else
+			  {
+			     	((PlanNode.Unary )child1).setChild(child2);
+			     	((PlanNode.Unary )rhs).setChild(child1);
+			  }
+			  	  
+			}
+			
+		) //just the aggregates
+	)
+
+
+
+	//same as select
+	{
+	  lhs=root;
+	  root=new UnionNode();
+	  ((UnionNode)root).setLHS(lhs);
+	  ((UnionNode)root).setRHS(rhs);	}
+	
+	)*
+		
+		< SEMICOLON >
+		)//this is outermost brace
+
+		{
+			allRoots.add(root);
+		}
+	}
+
+	ProjectionNode columnList():
+	{
+	  ProjectionNode columns=new ProjectionNode();
+	  Token col;
+	  String colName=null;
+	  Token range;
+	  String rangeName=null;	}
+	{
+	  (col=< STRING >
+	  {
+	    colName=col.image;
+	    rangeName=null;	  }
+	  (	    "."
+	    col=< STRING >
+	    {
+	      rangeName=colName;
+	      colName=col.image;	    }
+	  )?
+	  {
+	    columns.addColumn(new ProjectionNode.Column(colName, new ExprTree.VarLeaf(rangeName, colName)));
+	    rangeName=null;	  }
+	  (
+	    < COMMA >
+	    col=< STRING >
+	  {
+	    colName=col.image;
+	    rangeName=null;
+	  }
+	  (
+	    "."
+	    col=< STRING >
+	    {
+	      rangeName=colName;
+	      colName=col.image;
+	    }
+	  )?
+	  {
+	    columns.addColumn(new ProjectionNode.Column(colName, new ExprTree.VarLeaf(rangeName, colName)));
+	    rangeName=null;
+	  }
+	    	  )*
+
+	)//outermost brace
+	{
+		return columns;	} 
+	  	}
+
+	ExprTree whereClause():
+	{
+	  ExprTree rel=null;
+	  ExprTree loperand=null;
+	  ExprTree roperand=null;
+	  Token operator;
+	}
+	{
+	  (	    rel=whereTerm()
+	    (
+	      (operator=< AND >|operator=< OR >)	        roperand=whereTerm()
+	        {
+	          loperand=rel;
+	          if(operator.image.equalsIgnoreCase("and"))
+	          	rel=new ExprTree(ExprTree.OpCode.AND,loperand,roperand);
+	          else
+	          	rel=new ExprTree(ExprTree.OpCode.OR,loperand,roperand);	        }
+	      	    )*
+	  )//outermost brace
+	  {		return rel;
+	  }	}
+
+	ExprTree whereTerm():
+	{
+	 	  Token tableName1;
+		  Token colName1;		  Token tableName2;		  Token colName2;
+	  	ExprTree rel=null;
+	  	Token t;	}
+	{
+	  (
+	   (	      tableName1=< STRING >
+	    "."
+	    colName1=< STRING >
+	    (t=< EQUAL >|t=< NOTEQUAL >|t=< LESSTHAN >|t=< GREATERTHAN >|t=< LESSTHANEQUAL >|t=< GREATERTHANEQUAL >)
+	    tableName2=< STRING >
+	    "."
+	    colName2=< STRING >	    {
+	      String op=t.image;
+	      if(op.equals("="))			rel=new ExprTree(ExprTree.OpCode.EQ,new ExprTree.VarLeaf(tableName1.image, colName1.image),new ExprTree.VarLeaf(tableName2.image, colName2.image));
+		  else if(op.equals("<>"))
+		  	rel=new ExprTree(ExprTree.OpCode.NEQ,new ExprTree.VarLeaf(tableName1.image, colName1.image),new ExprTree.VarLeaf(tableName2.image, colName2.image));
+		  else if(op.equals("<"))
+		  	rel=new ExprTree(ExprTree.OpCode.LT,new ExprTree.VarLeaf(tableName1.image, colName1.image),new ExprTree.VarLeaf(tableName2.image, colName2.image));
+		  else if(op.equals(">"))
+		  	rel=new ExprTree(ExprTree.OpCode.GT,new ExprTree.VarLeaf(tableName1.image, colName1.image),new ExprTree.VarLeaf(tableName2.image, colName2.image));
+		  else if(op.equals("<="))
+		  	rel=new ExprTree(ExprTree.OpCode.LTE,new ExprTree.VarLeaf(tableName1.image, colName1.image),new ExprTree.VarLeaf(tableName2.image, colName2.image));
+		  else if(op.equals(">="))
+		  	rel=new ExprTree(ExprTree.OpCode.GTE,new ExprTree.VarLeaf(tableName1.image, colName1.image),new ExprTree.VarLeaf(tableName2.image, colName2.image));
+		  
+	    }
+	  )
+	 |(
+	   < LBRAC >
+	   rel=whereClause()
+	   < RBRAC >
+	 ) 	      	  )//outermost brace
+	  {		return rel;
+	  }	} 
+
+	PlanNode relations():
+	{		PlanNode rel=null;
+		PlanNode lhs=null;
+		PlanNode rhs=null;
+		Token relationT;
+		String relation;
+	}
+	{		(		  relationT=< STRING >
+		{
+		  relation=relationT.image;
+		  Schema.TableFromFile table=allTables.get(relation);
+		  rel=new ScanNode(relation, relation, table);		}
+		(
+		  < COMMA >
+		  relationT=< STRING >
+		  {			relation=relationT.image;
+			Schema.TableFromFile table2=allTables.get(relation);
+			lhs=rel;
+			rhs=new ScanNode(relation, relation, table2);
+			rel=new JoinNode();
+			((JoinNode)rel).setLHS(lhs);
+			((JoinNode)rel).setRHS(rhs);
+		  }		)*
+		) //outermost brace
+		{		  return rel;
+		}
+	}
+	
+	AggregateNode aggregate():	{
+		AggregateNode query_0 = new AggregateNode();
+		String functionType=new String();
+		Token aggT;
+		Token colT;
+		Token operatorT;
+		 String aggFun=new String();
+		 String col=new String();
+		 ExprTree rel=null;
+		 ExprTree loperand=null;
+		 ExprTree roperand=null;
+		 String colName=new String();
+	}
+	{
+	  (	(
+	    < COUNTAGG >
+	    {			colName="Count";
+	    }
+	    {
+	       query_0 = new AggregateNode();
+    		query_0.addAggregate(new AggregateNode.AggColumn(colName, new ExprTree.ConstLeaf(1),AggregateNode.AType.COUNT));	    }
+	    )// this is just for count
+	  | (	      (aggT=< SUM >|aggT=< AVG >|aggT=< MIN >|aggT=< MAX >)
+	    {
+	      aggFun=aggT.image;
+	      if(aggFun.equalsIgnoreCase("sum"))
+	      	colName="Sum";
+	      else if(aggFun.equalsIgnoreCase("avg"))
+	      	colName="Average";
+	      else if(aggFun.equalsIgnoreCase("min"))
+	      	colName="Min";
+	      else
+	      	colName="Max";	    }
+	    < LBRAC >
+	    colT=< STRING >
+		{
+		 col=colT.image;
+		 rel=new ExprTree.VarLeaf(null, col); 		}
+		(
+		  (operatorT=< PLUS >|operatorT=< MINUS >|operatorT=< MULTIPLY >|operatorT=< DIVIDE >)
+		  colT=< STRING >
+		 {
+		    col=colT.image;
+		    loperand=rel;
+		    roperand=new ExprTree.VarLeaf(null,col);
+		    if(operatorT.image.equals("+"))
+		    	rel=new ExprTree(ExprTree.OpCode.ADD,loperand ,roperand); 
+		    else if(operatorT.image.equals("-"))
+		    	rel=new ExprTree(ExprTree.OpCode.SUB,loperand ,roperand); 
+		    else if(operatorT.image.equals("*"))
+		    	rel=new ExprTree(ExprTree.OpCode.MULT,loperand ,roperand); 
+		    else if(operatorT.image.equals("/"))
+		    	rel=new ExprTree(ExprTree.OpCode.DIV,loperand ,roperand); 		  }		)*
+	    < RBRAC >
+	    // as will come here
+	    {
+	      if(aggFun.equalsIgnoreCase("sum"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.SUM));
+	      else if(aggFun.equalsIgnoreCase("avg"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.AVG));
+	      else if(aggFun.equalsIgnoreCase("min"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.MIN));
+	      else if(aggFun.equalsIgnoreCase("max"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.MAX));	    }
+
+	    
+	  
+//more than one aggregates
+	  (
+	    < COMMA >
+      (aggT=< SUM >|aggT=< AVG >|aggT=< MIN >|aggT=< MAX >)
+	    {
+	      aggFun=aggT.image;
+	      if(aggFun.equalsIgnoreCase("sum"))
+	      	colName="Sum";
+	      else if(aggFun.equalsIgnoreCase("avg"))
+	      	colName="Average";
+	      else if(aggFun.equalsIgnoreCase("min"))
+	      	colName="Min";
+	      else
+	      	colName="Max";
+	    }
+	    < LBRAC >
+	    colT=< STRING >
+		{
+		 col=colT.image;
+		 rel=new ExprTree.VarLeaf(null, col); 
+		}
+		(
+		  (operatorT=< PLUS >|operatorT=< MINUS >|operatorT=< MULTIPLY >|operatorT=< DIVIDE >)
+		  colT=< STRING >
+		 {
+		    col=colT.image;
+		    loperand=rel;
+		    roperand=new ExprTree.VarLeaf(null,col);
+		    if(operatorT.image.equals("+"))
+		    	rel=new ExprTree(ExprTree.OpCode.ADD,loperand ,roperand); 
+		    else if(operatorT.image.equals("-"))
+		    	rel=new ExprTree(ExprTree.OpCode.SUB,loperand ,roperand); 
+		    else if(operatorT.image.equals("*"))
+		    	rel=new ExprTree(ExprTree.OpCode.MULT,loperand ,roperand); 
+		    else if(operatorT.image.equals("/"))
+		    	rel=new ExprTree(ExprTree.OpCode.DIV,loperand ,roperand); 
+		  }
+		)*
+	    < RBRAC >
+	    // as will come here
+	    {
+	      if(aggFun.equalsIgnoreCase("sum"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.SUM));
+	      else if(aggFun.equalsIgnoreCase("avg"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.AVG));
+	      else if(aggFun.equalsIgnoreCase("min"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.MIN));
+	      else if(aggFun.equalsIgnoreCase("max"))
+	      	query_0.addAggregate(new AggregateNode.AggColumn(colName,rel,AggregateNode.AType.MAX));
+	    }
+	    
+	  )*	)    	  ) //outermost brace
+	  {	    return query_0;
+	   }	}
+
+
+	ExprTree constCondition():
+	{
+		ExprTree query0=null;
+	}
+	{
+		(		  query0=constExpression()//just the int/float and their expressions
+		| query0=booleanExpression()
+		| query0=stringExpr()
+		)//this is outermost bracket
+		{
+			return query0;
+		}
+	}
+
+	ExprTree stringExpr():
+	{
+	  ExprTree ret=null;
+	  String temp=new String();
+	  Token t;	}
+	{
+	  (	    < SINGLEQUOTE >
+	    (
+	      ((	        t=< DIVIDE >
+	        t=< CHARACTER >)
+	      | (t=< CHARACTER >))
+	      {
+	        temp=temp+t.image;	      }
+	      	    )*
+	  	< SINGLEQUOTE >
+	)//OUTERMOST BRACKET
+	{
+	  ret=new ExprTree.ConstLeaf(temp);
+	  return ret;	}	}
+
+	ExprTree booleanExpression():	{
+	  ExprTree ret=null;
+	  Token t;
+	  Token operator;
+	  ExprTree loperand=null;
+	  ExprTree roperand=null;	}
+	{
+	  (	     (
+	      ((t=<TRUE >|t=< FALSE >)
+	      {
+	        if(t.image.equalsIgnoreCase("true"))
+	        	ret=new ExprTree.ConstLeaf(true);
+	        else
+	        	ret=new ExprTree.ConstLeaf(false);	      })
+	      ( (operator=< AND >|operator=< OR >)
+	      	(t=< TRUE >|t=< FALSE >)	      	 {
+	      	   loperand=ret;
+	      	   if(t.image.equalsIgnoreCase("true"))
+	      	   	roperand=new ExprTree.ConstLeaf(true);
+	      	   else  
+	      	   	roperand=new ExprTree.ConstLeaf(false);
+
+	      	   if(operator.image.equalsIgnoreCase("and"))
+	      	   		ret=new ExprTree(ExprTree.OpCode.AND,loperand,roperand);
+	      	   else
+	      	   		ret=new ExprTree(ExprTree.OpCode.OR,loperand,roperand);	      	 } 
+	        	      )?	    ) // for simple true false and or
+	  | (
+	    < NOT >
+	    (t=< TRUE >|t=< FALSE >)
+	    {
+	      if(t.image.equalsIgnoreCase("true"))
+	      	ret=new ExprTree(ExprTree.OpCode.NOT, new ExprTree.ConstLeaf(true));
+	      else
+	     	ret=new ExprTree(ExprTree.OpCode.NOT, new ExprTree.ConstLeaf(false)); 		    }
+	    
+	  ) //not followed by true or false	  )//outermost bracket
+	  {
+	    return ret;	  }	}
+
+	
+	ExprTree constExpression():
+	{
+		ExprTree ret=null;
+		Token t;
+		String strVal=new String();
+		ExprTree loperand=null;
+		ExprTree roperand=null;
+	}
+	{
+	  (	    ret=term()
+	    ( (t=< PLUS >|t=< MINUS >)
+	    	roperand=term()
+	    	{
+	    	  loperand=ret;
+	    	  if(t.image.equals("+"))
+	    	  	ret=new ExprTree(ExprTree.OpCode.ADD, loperand, roperand);
+	    	  else
+	    	  	ret=new ExprTree(ExprTree.OpCode.SUB, loperand, roperand);	    	}	    )*
+	  ) //this is outermost bracket
+	  {
+	    return ret;	  }
+	  
+	  //END OF NEW CODE
+
+	}
+
+
+	ExprTree term():
+	{
+		ExprTree ret=null;
+		Token t;
+		String strVal=new String();
+		ExprTree loperand=null;
+		ExprTree roperand=null;
+	}
+	{
+	  (
+	    ret=element()
+	    ( (t=< MULTIPLY >|t=< DIVIDE >)
+	    	roperand=element()
+	    	{
+	    	  loperand=ret;
+	    	  if(t.image.equals("*"))
+	    	  	ret=new ExprTree(ExprTree.OpCode.MULT, loperand, roperand);
+	    	  else
+	    	  	ret=new ExprTree(ExprTree.OpCode.DIV, loperand, roperand);
+	    	}
+	    )*
+	  ) //this is outermost bracket
+	  {
+	    return ret;
+	  }
+	}
+
+	ExprTree element():
+	{
+	  ExprTree ret=null;
+	  String strVal=new String();
+	  Token t;	}
+	{
+	  (
+	    (
+	      t=< INTNUMBER >
+				{
+					strVal=t.image;
+					ret=new ExprTree.ConstLeaf(Integer.parseInt(strVal));	
+				}
+				| t=< FLOATNUMBER >
+				{
+					strVal=t.image;
+					ret=new ExprTree.ConstLeaf(Float.parseFloat(strVal));	
+				}
+				| t = <  EXPONENTIAL >
+				{
+					strVal=t.image;
+					ret=new ExprTree.ConstLeaf(Float.parseFloat(strVal));	
+				}
+	      	    )//its a constant
+	  | (
+	    	< LBRAC >
+	    	ret=constExpression()
+	    	< RBRAC >
+	  	) //its a expression surrounded by brackets	  )//this is outermost bracket
+	  {
+	    return ret;	  }	}
+	
+	void create():
+	{
+		String tableName=new String();
+		String fileName=new String();
+		Map<String,String > cols=new LinkedHashMap<String,String >();
+		Token t;
+	}
+	{
+		< CREATE_TABLE >
+		t=< STRING >
+		{
+			tableName=t.image;
+		}
+		cols = columns()
+				< FROM_FILE >
+		t=< PATH>
+		{           
+			fileName=t.image.substring(1,t.image.length()-1);
+		}
+		< USING_CSV >
+		< SEMICOLON >
+		{
+			Schema.TableFromFile table=new Schema.TableFromFile(new File(fileName));
+			for(String key:cols.keySet())
+			{
+				if(cols.get(key).equalsIgnoreCase("int"))
+				{
+					table.add(new Schema.Column(tableName, key, Schema.Type.INT));
+				}
+				else if(cols.get(key).equalsIgnoreCase("float"))
+				{
+					table.add(new Schema.Column(tableName, key, Schema.Type.FLOAT));
+				}
+				else if(cols.get(key).equalsIgnoreCase("string"))
+				{
+					table.add(new Schema.Column(tableName, key, Schema.Type.STRING));
+				}	
+			}
+			allTables.put(tableName,table);
+		}
+
+	}
+
+	Map<String,String > columns():
+	{
+		Map<String,String > cols=new LinkedHashMap<String,String >();
+		String colName=new String();
+		String colType=new String();
+		Token t;
+	}
+	{
+		< LBRAC >
+		(
+				t=< STRING >
+				{
+					colName=t.image;
+				}
+				(
+						t=< INTDT > |
+						t=< FLOATDT >|
+						t=< STRINGDT >
+						)
+
+						{
+					colType= t.image;
+					cols.put(colName,colType);
+						}
+				)
+				(
+						< COMMA >
+						t=< STRING >
+						{
+							colName=t.image;
+						}
+						(
+								t=< INTDT > |
+								t=< FLOATDT >|
+								t=< STRINGDT >
+								)
+
+								{
+							colType= t.image;
+							cols.put(colName,colType);
+								}
+						)*
+						< RBRAC >
+		{
+			return cols;
+		}
+	}
+

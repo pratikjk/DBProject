@@ -12,6 +12,20 @@ FILES := 	SqlException \
 			plan/SelectionNode \
 			plan/NullSourceNode \
 			plan/AggregateNode \
+			operations/AggregateOperator \
+			operations/IntersectionOperation \
+			operations/JoinOperator \
+			operations/ProjectOperation \
+			operations/ScanOperator \
+			operations/SelectOperation \
+			operations/UnionOperator \
+			parser/Token \
+			parser/ParserConstants \
+			parser/ParseException \
+			parser/SimpleCharStream \
+			parser/TokenMgrError \
+			parser/ParserTokenManager \
+			parser/Parser \
 			Sql \
 			test/TestHarness
 
